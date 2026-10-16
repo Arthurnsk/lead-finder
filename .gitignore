@@ -1,0 +1,14 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+database/*.db
+outputs/
+.idea/workspace.xml
+backend/.venv/
+.pytest_cache/
+frontend/node_modules/
+frontend/dist/
+backups/
+.DS_Store
+legacy/pilot-db/*.db

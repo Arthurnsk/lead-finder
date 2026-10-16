@@ -1,0 +1,29 @@
+# SearXNG for Lead Finder: internal JSON API, a curated set of engines that tolerate automated use.
+use_default_settings:
+  engines:
+    keep_only:
+      - duckduckgo
+      - brave
+      - bing
+      - mojeek
+      - yandex
+      - startpage
+
+general:
+  instance_name: "leadfinder-search"
+
+server:
+  secret_key: "set-by-SEARXNG_SECRET-env"
+  limiter: false          # only reachable inside the compose network
+  image_proxy: false
+
+search:
+  safe_search: 0
+  default_lang: "ru"
+  formats:
+    - html
+    - json
+
+outgoing:
+  request_timeout: 6.0
+  max_request_timeout: 12.0

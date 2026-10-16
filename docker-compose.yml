@@ -1,0 +1,77 @@
+name: leadfinder
+
+x-backend: &backend
+  build: ./backend
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+psycopg://leadgen:${POSTGRES_PASSWORD:-leadgen}@db:5432/leadgen
+    SEARXNG_URL: http://searxng:8080
+  depends_on:
+    db:
+      condition: service_healthy
+  volumes:
+    - tgsessions:/data/telegram          # Telegram user session (created by manage.py telegram-login)
+  extra_hosts:
+    - "host.docker.internal:host-gateway"  # MTPLX/Qwen on the Mac host
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: leadgen
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-leadgen}
+      POSTGRES_DB: leadgen
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leadgen"]
+      interval: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    <<: *backend
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    volumes:
+      - tgsessions:/data/telegram
+      - ./niches:/seed/niches:ro
+      - ./legacy/pilot-db:/seed/legacy:ro
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "app.worker.runner"]
+    depends_on:
+      api:
+        condition: service_healthy  # api runs the migrations first
+
+  web:
+    build: ./frontend
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:80"
+    restart: unless-stopped
+
+  searxng:
+    image: searxng/searxng:latest
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-change-me}
+      SEARXNG_BASE_URL: http://searxng:8080/
+    volumes:
+      - ./deploy/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    ports:
+      - "127.0.0.1:8888:8080"  # for debugging only; the app talks to it inside the network
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  tgsessions:
